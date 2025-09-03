@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentspace 料金シミュレーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: アプリケーションは4つの主要セクションで構成されます。1) 料金の3つの柱（ライセンス、データ量、接続先）を概観する「概要」。2) ユーザーが自身の状況に合わせてコストを即座に試算できる「インタラクティブシミュレーター」。3) 各料金体系の詳細を解説する「料金詳細」。4) コスト削減のヒントをまとめた「最適化のコツ」。この構造は、まず全体像を提示し、次いで具体的なアクション（試算）を促し、必要に応じて詳細情報を提供することで、複雑な料金体系の理解を段階的かつ直感的に深めるために選択されました。 -->
+    <!-- Visualization & Content Choices: 
+        - 料金概要: Goal: Inform -> 3つのカードレイアウトで主要な課金要素を提示。Interaction: なし。Justification: 全体像を素早く把握させるため。Method: HTML/Tailwind。
+        - 料金シミュレーター: Goal: Compare/Calculate -> ユーザー数スライダーとプラン選択ボタンで月額費用とデータプールを動的に計算・表示。Interaction: ユーザー入力に応じて即座に結果が更新される。Justification: ユーザー自身の状況に合わせた具体的なコスト感を掴ませるため。Method: JS, Chart.js。
+        - データプール使用例: Goal: Inform -> ドーナツチャートでデータの内訳を可視化。Interaction: なし。Justification: 「プール」という概念を視覚的に理解させるため。Method: Chart.js。
+        - プラン比較: Goal: Compare -> HTMLテーブルで各プランの仕様を一覧化。Interaction: なし。Justification: プラン間の違いを明確に比較検討させるため。Method: HTML/Tailwind。
+        これらの選択は、テキスト情報をインタラクティブな体験に変換し、ユーザーの能動的な理解を促進することを目的としています。 -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #FDFBF8;
+            color: #333;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .plan-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .plan-button.selected {
+            background-color: #005f73;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #005f73;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #e0e0e0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-[#005f73] mb-4">Agentspace 料金体系ガイド</h1>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">インタラクティブなシミュレーターで、あなたの組織に最適なプランとコストを明らかにします。</p>
+        </header>
+
+        <main>
+            <section id="overview" class="mb-16">
+                <h2 class="text-3xl font-bold text-center mb-8 text-[#0a9396]">料金の全体像：3つの主要素</h2>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <div class="flex items-center justify-center h-12 w-12 rounded-full bg-[#e9d8a6] text-[#947002] mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-center mb-2">1. 席（ライセンス）課金</h3>
+                        <p class="text-gray-600 text-center">ユーザー数に応じた月額費用です。Enterpriseプランは<strong class="text-[#005f73]">$25/ユーザー/月</strong>から利用可能です。</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <div class="flex items-center justify-center h-12 w-12 rounded-full bg-[#ee9b00] text-white mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7v10M12 21v-8M20 7v10" /></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-center mb-2">2. データ量（インデックス）</h3>
+                        <p class="text-gray-600 text-center">検索対象として取り込むデータ量です。組織内の全ユーザーの利用枠を<strong class="text-[#005f73]">合算（プール）</strong>して利用します。</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                        <div class="flex items-center justify-center h-12 w-12 rounded-full bg-[#9b2226] text-white mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-center mb-2">3. 接続先の従量課金</h3>
+                        <p class="text-gray-600 text-center">Agentspace経由でBigQueryなどを使用した場合、その<strong class="text-[#005f73]">サービス側の利用料金</strong>が別途発生します。</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="simulator" class="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 mb-16">
+                 <h2 class="text-3xl font-bold text-center mb-2 text-[#0a9396]">料金シミュレーター</h2>
+                 <p class="text-center text-gray-600 mb-8">スライダーとボタンで条件を指定し、コストの目安を算出します。</p>
+                <div class="grid lg:grid-cols-2 gap-8 items-center">
+                    <div class="flex flex-col space-y-8">
+                        <div>
+                            <label for="userCount" class="block font-semibold text-lg mb-2">ユーザー数: <span id="userCountValue" class="text-[#005f73] font-bold">100</span>人</label>
+                            <input type="range" id="userCount" min="10" max="1000" value="100" step="10" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div>
+                            <span class="block font-semibold text-lg mb-2">エディション選択</span>
+                            <div class="flex flex-wrap gap-4">
+                                <button data-plan="Frontline" class="plan-button flex-1 text-center py-3 px-4 bg-gray-100 text-gray-800 font-semibold rounded-lg hover:bg-gray-200">Frontline</button>
+                                <button data-plan="Enterprise" class="plan-button flex-1 text-center py-3 px-4 bg-gray-100 text-gray-800 font-semibold rounded-lg hover:bg-gray-200 selected">Enterprise</button>
+                                <button data-plan="Enterprise Plus" class="plan-button flex-1 text-center py-3 px-4 bg-gray-100 text-gray-800 font-semibold rounded-lg hover:bg-gray-200">Enterprise Plus</button>
+                            </div>
+                        </div>
+                        <div class="bg-[#F0F9FF] p-6 rounded-lg border border-[#B9E6FE]">
+                           <h4 class="font-bold text-xl text-[#005f73] mb-4">試算結果</h4>
+                           <div class="space-y-3">
+                                <div class="flex justify-between items-baseline">
+                                   <span class="text-gray-700">選択プラン:</span>
+                                   <span id="resultPlan" class="font-bold text-2xl text-right">Enterprise</span>
+                               </div>
+                               <div class="flex justify-between items-baseline">
+                                   <span class="text-gray-700">月額ライセンス費用 (目安):</span>
+                                   <span id="licenseCost" class="font-bold text-2xl text-right text-[#005f73]">$2,500</span>
+                               </div>
+                               <div class="flex justify-between items-baseline">
+                                   <span class="text-gray-700">合計データプール/月:</span>
+                                   <span id="dataPool" class="font-bold text-2xl text-right text-[#005f73]">3.00 TiB</span>
+                               </div>
+                           </div>
+                           <p class="text-xs text-gray-500 mt-4">※ライセンス費用は目安です。FrontlineとEnterprise Plusの価格は営業担当へお問い合わせください。接続先の従量課金は含まれません。</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="chart-container">
+                            <canvas id="costChart"></canvas>
+                        </div>
+                        <p class="text-center text-sm text-gray-500 mt-2">ユーザー数に応じた月額ライセンス費用の変化</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="details" class="mb-16">
+                <h2 class="text-3xl font-bold text-center mb-8 text-[#0a9396]">料金詳細</h2>
+                <div class="space-y-12">
+                    <div>
+                        <h3 class="text-2xl font-semibold mb-4 text-center md:text-left">エディション別 データ量上限と特徴</h3>
+                        <div class="overflow-x-auto bg-white p-4 rounded-lg shadow-md">
+                            <table class="w-full text-left">
+                                <thead class="border-b-2 border-gray-200">
+                                    <tr>
+                                        <th class="py-3 px-4 font-semibold">エディション</th>
+                                        <th class="py-3 px-4 font-semibold">データ量上限/ユーザー</th>
+                                        <th class="py-3 px-4 font-semibold">月額ライセンス(目安)</th>
+                                        <th class="py-3 px-4 font-semibold">特徴</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-gray-100">
+                                        <td class="py-3 px-4 font-medium">Frontline</td>
+                                        <td class="py-3 px-4">2 GiB / 月</td>
+                                        <td class="py-3 px-4">要問い合わせ</td>
+                                        <td class="py-3 px-4">Enterpriseプランとデータプールを共有</td>
+                                    </tr>
+                                    <tr class="border-b border-gray-100 bg-blue-50">
+                                        <td class="py-3 px-4 font-medium text-[#005f73]">Enterprise</td>
+                                        <td class="py-3 px-4 font-bold text-[#005f73]">30 GiB / 月</td>
+                                        <td class="py-3 px-4 font-bold text-[#005f73]">$25~ / 月</td>
+                                        <td class="py-3 px-4">標準的なプラン。組織内でプール可能</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 px-4 font-medium">Enterprise Plus</td>
+                                        <td class="py-3 px-4">75 GiB / 月</td>
+                                        <td class="py-3 px-4">要問い合わせ</td>
+                                        <td class="py-3 px-4">大規模なデータ利用に対応</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-2xl font-semibold mb-4 text-center">データプールとは？</h3>
+                        <div class="grid md:grid-cols-2 gap-8 items-center bg-white p-8 rounded-lg shadow-md">
+                            <div class="prose max-w-none">
+                                <p>「データプール」とは、組織に所属する全ユーザーのデータ量上限を合算し、全員で共有して使える仕組みです。</p>
+                                <p>例えば、<strong>Enterpriseプランを100ユーザー</strong>で契約した場合、組織全体で利用できるデータ量は以下のようになります。</p>
+                                <p class="text-2xl font-bold text-center my-4 text-[#005f73]">30 GiB/人 × 100人 = 3000 GiB ≈ 3 TiB/月</p>
+                                <p>これにより、一部のユーザーが多くデータを使用しても、他のユーザーの枠でカバーできるため、柔軟なデータ活用が可能です。</p>
+                                <h4 class="font-semibold mt-6">何がデータ量を消費するの？</h4>
+                                <p>コネクタを通じてAgentspace内に取り込み、インデックス化（検索用に保持）されるデータが対象です。PDF、HTMLなどの非構造化データから、BigQueryの構造化データ、JiraやConfluenceなどのSaaSデータまで、すべてが「データストア」に取り込まれ、消費量の計算対象となります。</p>
+                            </div>
+                            <div>
+                                <div class="chart-container">
+                                    <canvas id="dataUsageChart"></canvas>
+                                </div>
+                                <p class="text-center text-sm text-gray-500 mt-2">データプール利用例 (合計3 TiB/月)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="optimization" class="bg-[#FFFBEB] p-8 rounded-2xl border border-[#FEF3C7]">
+                 <h2 class="text-3xl font-bold text-center mb-8 text-[#92400E]">コストを抑えるコツ</h2>
+                 <div class="grid md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2 text-[#005f73]">1. インデックス対象の厳選</h4>
+                        <p class="text-gray-600">本当に必要なデータのみをインデックス対象とすることで、データ量を削減できます。コネクタ設定で範囲を絞り込み、不要なデータを取り込まないようにしましょう。</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2 text-[#005f73]">2. ライセンスの整理</h4>
+                        <p class="text-gray-600">ライセンスはマルチリージョン単位（us/eu/globalなど）です。利用する地域を明確にし、重複した契約を避けることで、不要なライセンス費用をなくせます。</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg">
+                         <h4 class="font-bold text-lg mb-2 text-[#005f73]">3. 接続先コストの最適化</h4>
+                        <p class="text-gray-600">BigQueryなどの接続先サービス側のコストは別途発生します。BigQueryであれば、課金モデルを「走査量課金」と「スロット予約」から選択し、利用状況に合わせて最適化しましょう。</p>
+                    </div>
+                 </div>
+            </section>
+        </main>
+
+    </div>
+
+    <script>
+        const planData = {
+            'Frontline': { price: 15, data: 2, note: '要問い合わせ' },
+            'Enterprise': { price: 25, data: 30, note: '$25~' },
+            'Enterprise Plus': { price: 40, data: 75, note: '要問い合わせ' },
+        };
+
+        const userCountInput = document.getElementById('userCount');
+        const userCountValue = document.getElementById('userCountValue');
+        const planButtons = document.querySelectorAll('.plan-button');
+        
+        const resultPlan = document.getElementById('resultPlan');
+        const licenseCost = document.getElementById('licenseCost');
+        const dataPool = document.getElementById('dataPool');
+
+        let selectedPlan = 'Enterprise';
+        let currentUserCount = 100;
+
+        function formatDataSize(gib) {
+            if (gib < 1024) {
+                return `${gib.toFixed(2)} GiB`;
+            } else {
+                return `${(gib / 1024).toFixed(2)} TiB`;
+            }
+        }
+        
+        const costChartCtx = document.getElementById('costChart').getContext('2d');
+        let costChart = new Chart(costChartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '月額ライセンス費用',
+                    data: [],
+                    backgroundColor: 'rgba(0, 95, 115, 0.1)',
+                    borderColor: '#005f73',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#005f73'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value / 1000 + 'k';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        function updateCostChart(userCount, plan) {
+             const dataPoints = 10;
+             const step = Math.max(10, Math.floor(userCount * 2 / dataPoints));
+             const labels = [];
+             const data = [];
+             
+             for(let i = 0; i <= dataPoints; i++) {
+                 const count = i * step;
+                 labels.push(count);
+                 data.push(count * planData[plan].price);
+             }
+             
+             costChart.data.labels = labels;
+             costChart.data.datasets[0].data = data;
+             costChart.update();
+        }
+
+        function calculate() {
+            currentUserCount = parseInt(userCountInput.value);
+            userCountValue.textContent = currentUserCount;
+            
+            const plan = planData[selectedPlan];
+            
+            const totalCost = currentUserCount * plan.price;
+            const totalData = currentUserCount * plan.data;
+            
+            resultPlan.textContent = selectedPlan;
+            licenseCost.textContent = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalCost);
+            dataPool.textContent = formatDataSize(totalData);
+
+            updateCostChart(currentUserCount, selectedPlan);
+        }
+
+        userCountInput.addEventListener('input', calculate);
+
+        planButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                planButtons.forEach(btn => btn.classList.remove('selected'));
+                button.classList.add('selected');
+                selectedPlan = button.dataset.plan;
+                calculate();
+            });
+        });
+        
+        const dataUsageChartCtx = document.getElementById('dataUsageChart').getContext('2d');
+        const dataUsageChart = new Chart(dataUsageChartCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['SharePoint (1.5 TiB)', 'Drive (1.2 TiB)', '残り (0.3 TiB)'],
+                datasets: [{
+                    data: [1.5, 1.2, 0.3],
+                    backgroundColor: ['#0A9396', '#94D2BD', '#E9D8A6'],
+                    borderColor: '#FFFFFF',
+                    borderWidth: 4,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    },
+                    tooltip: {
+                         callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw} TiB`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('load', calculate);
+    </script>
+</body>
+</html>
